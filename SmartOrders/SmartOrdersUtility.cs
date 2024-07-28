@@ -71,7 +71,7 @@ public static class SmartOrdersUtility
         var distanceInMeters = GetDistanceForSwitchOrder(switchesToFind, clearSwitchesUnderTrain, stopBeforeSwitch, locomotive, persistence);
         if (distanceInMeters != null)
         {
-            helper.SetOrdersValue(AutoEngineerMode.Yard, null, null, distanceInMeters!);
+            helper.SetOrdersValue(null, null, null, distanceInMeters!);
         }
         else
         {
