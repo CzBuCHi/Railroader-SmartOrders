@@ -1,10 +1,11 @@
-﻿namespace SmartOrders.HarmonyPatches;
+﻿using CarInspectorResizer.Behaviors;
+
+namespace SmartOrders.HarmonyPatches;
 
 using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Drawing;
 using System.Linq;
-using CarInspectorResizer.Behaviors;
+using System.Runtime.Remoting.Messaging;
 using Game.Messages;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -16,6 +17,7 @@ using UI.CarInspector;
 using UI.Common;
 using UI.EngineControls;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 [PublicAPI]
 [HarmonyPatch]
@@ -26,11 +28,10 @@ public static class CarInspectorPatches
     [HarmonyPatch(typeof(CarInspector), "Populate")]
     public static void Populate(ref Window ____window) {
         var windowAutoHeight = ____window.gameObject!.GetComponent<CarInspectorAutoHeightBehavior>()!;
-        windowAutoHeight.ExpandOrders(AutoEngineerMode.Yard, 60 + 30 + 30);
-        windowAutoHeight.ExpandOrders(AutoEngineerMode.Road, 60 + 30 + 30);
+        windowAutoHeight.ExpandOrders(AutoEngineerMode.Yard, 30 + 60 + 30);
     }
 
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [HarmonyPatch(typeof(CarInspector), "BuildContextualOrders")]
     public static void BuildContextualOrders(UIPanelBuilder builder, AutoEngineerPersistence persistence, Car ____car, Window ____window)
     {
@@ -42,11 +43,80 @@ public static class CarInspectorPatches
         var helper = new AutoEngineerOrdersHelper(locomotive, persistence);
         var mode2 = helper.Mode();
 
-        if (mode2 == AutoEngineerMode.Off)
+        if (mode2 == AutoEngineerMode.Yard)
         {
-            return;
+            BuildAlternateCarLengthsButtons(builder, locomotive, helper);
+            BuildSwitchYardAIButtons(builder, locomotive, persistence, helper);
         }
 
+        //builder.AddExpandingVerticalSpacer();
+        BuildHandbrakeAndAirHelperButons(builder, locomotive);
+    }
+
+    private static void BuildAlternateCarLengthsButtons(UIPanelBuilder builder, BaseLocomotive locomotive, AutoEngineerOrdersHelper helper)
+    {
+        
+        builder.AddField("Car Lengths".Color("aaaaaa"), builder.ButtonStrip(delegate (UIPanelBuilder builder)
+        {
+            builder.AddButton("Stop", delegate
+            {
+                MoveDistance(helper, locomotive, 0f);
+            });
+            builder.AddButton("½", delegate
+            {
+                MoveDistance(helper,locomotive, 6.1f);
+            });
+            builder.AddButton("1", delegate
+            {
+                MoveDistance(helper,locomotive, 12.2f);
+            });
+            builder.AddButton("2", delegate
+            {
+                MoveDistance(helper,locomotive, 24.4f);
+            });
+            builder.AddButton("5", delegate
+            {
+                MoveDistance(helper,locomotive, 61f);
+            });
+            builder.AddButton("10", delegate
+            {
+                MoveDistance(helper,locomotive, 122f);
+            });
+            builder.AddButton("20", delegate
+            {
+                MoveDistance(helper,locomotive, 244f);
+            });
+            builder.AddButton("inf", delegate
+            {
+                MoveDistance(helper,locomotive, 12.192f * 1_000_000.5f);
+            }).Tooltip("INF", "Move infinity car lengths");
+        }, 4));
+    }
+
+    private static void BuildHandbrakeAndAirHelperButons(UIPanelBuilder builder, BaseLocomotive locomotive)
+    {
+        builder.AddField("",
+          builder.ButtonStrip(strip =>
+          {
+              var cars = locomotive.EnumerateCoupled()!.ToList()!;
+
+              if (cars.Any(c => c.air!.handbrakeApplied))
+              {
+                  strip.AddButton($"Release {TextSprites.HandbrakeWheel}", () => SmartOrdersUtility.ReleaseAllHandbrakes(locomotive))!
+                      .Tooltip("Release handbrakes", $"Iterates over cars in this consist and releases {TextSprites.HandbrakeWheel}.");
+              }
+
+              if (cars.Any(c => c.EndAirSystemIssue()))
+              {
+                  strip.AddButton("Connect Air", () => SmartOrdersUtility.ConnectAir(locomotive))!
+                      .Tooltip("Connect Consist Air", "Iterates over each car in this consist and connects gladhands and opens anglecocks.");
+              }
+          })!
+       );
+    }
+
+    private static void BuildSwitchYardAIButtons(UIPanelBuilder builder, BaseLocomotive locomotive, AutoEngineerPersistence persistence, AutoEngineerOrdersHelper helper)
+    {
         Func<BaseLocomotive, string> getClearSwitchMode = (BaseLocomotive loco) =>
         {
             string defaultMode = "CLEAR_AHEAD";
@@ -59,68 +129,100 @@ public static class CarInspectorPatches
             return clearSwitchMode;
         };
 
-        builder
-            .AddField("Switches", builder.ButtonStrip(delegate(UIPanelBuilder strip) {
-                strip.AddObserver(locomotive.KeyValueObject.Observe("CLEAR_SWITCH_MODE", delegate {
-                    strip.Rebuild();
-                }, callInitial: false));
+        builder.AddField("Switches", builder.ButtonStrip(delegate (UIPanelBuilder builder)
+        {
+            builder.AddObserver(locomotive.KeyValueObject.Observe("CLEAR_SWITCH_MODE", delegate
+            {
+                builder.Rebuild();
+            }, callInitial: false));
 
-                strip
-                    .AddButtonSelectable("Approach\nahead", getClearSwitchMode(locomotive) == "APPROACH_AHEAD", delegate {
-                        SmartOrdersUtility.DebugLog("updating switch mode to 'approach ahead'");
-                        locomotive.KeyValueObject.Set("CLEAR_SWITCH_MODE", "APPROACH_AHEAD");
-                    })!
-                    .Tooltip("Approach Ahead", "Approach, but do not pass, the Nth switch found in front of the train. Select the number of switches to move below after enabling this mode.")!
-                    .Height(60);
+            builder.AddButtonSelectable("Approach\nAhead", getClearSwitchMode(locomotive) == "APPROACH_AHEAD", delegate
+            {
+                SmartOrdersUtility.DebugLog("updating switch mode to 'approach ahead'");
+                locomotive.KeyValueObject.Set("CLEAR_SWITCH_MODE", "APPROACH_AHEAD");
+            }).Height(60).Tooltip("Approach Ahead", "Approach but do not pass switches in front of the train. Choose the number of switches below");
 
-                strip
-                    .AddButtonSelectable("Clear\nahead", getClearSwitchMode(locomotive) == "CLEAR_AHEAD", delegate {
-                        SmartOrdersUtility.DebugLog("updating switch mode to 'clear ahead'");
-                        locomotive.KeyValueObject.Set("CLEAR_SWITCH_MODE", "CLEAR_AHEAD");
-                    })!
-                    .Tooltip("Approach Ahead", "Clear, the Nth switch found in front of the train. Select the number of switches to move below after enabling this mode.")!
-                    .Height(60);
+            builder.AddObserver(locomotive.KeyValueObject.Observe("CLEAR_SWITCH_MODE", delegate
+            {
+                builder.Rebuild();
+            }, callInitial: false));
 
-                strip
-                    .AddButtonSelectable("Clear\nunder", getClearSwitchMode(locomotive) == "CLEAR_UNDER", delegate {
-                        SmartOrdersUtility.DebugLog("updating switch mode to 'clear under'");
-                        locomotive.KeyValueObject.Set("CLEAR_SWITCH_MODE", "CLEAR_UNDER");
-                    })!
-                    .Tooltip("Clear Under", "Clear, the Nth switch under the train. Select the number of switches to move below after enabling this mode.")!
-                    .Height(60);
-            }))
-            .Height(60);
+            builder.AddButtonSelectable("Clear\nAhead", getClearSwitchMode(locomotive) == "CLEAR_AHEAD", delegate
+            {
+                SmartOrdersUtility.DebugLog("updating switch mode to 'clear ahead'");
+                locomotive.KeyValueObject.Set("CLEAR_SWITCH_MODE", "CLEAR_AHEAD");
+            }).Height(60).Tooltip("Clear Ahead", "Clear switches in front of the train. Choose the number of switches below");
 
-        builder.AddField("", builder.ButtonStrip(
-            strip => {
-                strip.AddButton("1", () => SmartOrdersUtility.Move(helper, 1, locomotive.KeyValueObject.Get("CLEAR_SWITCH_MODE"), locomotive, persistence))!
+            builder.AddButtonSelectable("Clear\nUnder", getClearSwitchMode(locomotive) == "CLEAR_UNDER", delegate
+            {
+                SmartOrdersUtility.DebugLog("updating switch mode to 'clear under'");
+                locomotive.KeyValueObject.Set("CLEAR_SWITCH_MODE", "CLEAR_UNDER");
+            }).Height(60).Tooltip("Clear Under", "Clear switches under the train. Choose the number of switches below");
+        })).Height(60);
+
+
+        builder.AddField("", builder.ButtonStrip(delegate (UIPanelBuilder builder)
+        {
+            builder.ButtonStrip(
+            strip =>
+            {
+                strip.AddButton("1", () => MovePastSwitches(helper, 1, locomotive.KeyValueObject.Get("CLEAR_SWITCH_MODE"), locomotive, persistence))!
                     .Tooltip("1 switch", "Move 1 switch");
 
-                for (var i = 2; i <= 10; i++) {
+                for (var i = 2; i <= 10; i++)
+                {
                     var numSwitches = i;
-                    strip.AddButton($"{numSwitches}", () => SmartOrdersUtility.Move(helper, numSwitches, locomotive.KeyValueObject.Get("CLEAR_SWITCH_MODE"), locomotive, persistence))!
+                    strip.AddButton($"{numSwitches}", () => MovePastSwitches(helper, numSwitches, locomotive.KeyValueObject.Get("CLEAR_SWITCH_MODE"), locomotive, persistence))!
                         .Tooltip($"{numSwitches} switches", $"Move {numSwitches} switches");
                 }
-            }, 4));
-
-        builder.AddField("",
-           builder.ButtonStrip(strip =>
-           {
-               var cars = locomotive.EnumerateCoupled()!.ToList()!;
-
-               if (cars.Any(c => c.air!.handbrakeApplied))
-               {
-                   strip.AddButton($"Release {TextSprites.HandbrakeWheel}", () => SmartOrdersUtility.ReleaseAllHandbrakes(cars))!
-                       .Tooltip("Release handbrakes", $"Iterates over cars in this consist and releases {TextSprites.HandbrakeWheel}.");
-               }
-
-               if (cars.Any(c => c.EndAirSystemIssue()))
-               {
-                   strip.AddButton("Connect Air", () => SmartOrdersUtility.ConnectAir(cars))!
-                       .Tooltip("Connect Consist Air", "Iterates over each car in this consist and connects gladhands and opens anglecocks.");
-               }
-           })!
-        );
+            }, 4);
+        }));
     }
 
+    private static void MoveDistance(AutoEngineerOrdersHelper helper, BaseLocomotive locomotive, float distance)
+    {
+        if (SmartOrdersPlugin.Settings.AutoSwitchOffHanbrake)
+        {
+            SmartOrdersUtility.ReleaseAllHandbrakes(locomotive);
+        }
+
+        if (SmartOrdersPlugin.Settings.AutoCoupleAir)
+        {
+            SmartOrdersUtility.ConnectAir(locomotive);
+        }
+
+        helper.SetOrdersValue(AutoEngineerMode.Yard, null, null, distance);
+    }
+
+    private static void MovePastSwitches(AutoEngineerOrdersHelper helper, int switchesToFind, KeyValue.Runtime.Value mode, BaseLocomotive locomotive, AutoEngineerPersistence persistence)
+    {
+        bool clearSwitchesUnderTrain = false;
+        bool stopBeforeSwitch = false;
+
+        if (mode.IsNull)
+        {
+            mode = "CLEAR_AHEAD";
+        }
+
+        if (mode == "CLEAR_UNDER")
+        {
+            clearSwitchesUnderTrain = true;
+        }
+        else if (mode == "APPROACH_AHEAD")
+        {
+            stopBeforeSwitch = true;
+        }
+
+        SmartOrdersUtility.DebugLog($"Handling move order mode: {mode}, switchesToFind: {switchesToFind}, clearSwitchesUnderTrain: {clearSwitchesUnderTrain}, stopBeforeSwitch: {stopBeforeSwitch}");
+
+        var distanceInMeters = SmartOrdersUtility.GetDistanceForSwitchOrder(switchesToFind, clearSwitchesUnderTrain, stopBeforeSwitch, locomotive, persistence);
+        if (distanceInMeters != null)
+        {
+            MoveDistance(helper, locomotive, distanceInMeters.Value);
+        }
+        else
+        {
+            SmartOrdersUtility.DebugLog("ERROR: distanceInMeters is null");
+        }
+    }
 }
