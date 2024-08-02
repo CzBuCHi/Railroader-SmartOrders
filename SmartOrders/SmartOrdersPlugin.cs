@@ -1,3 +1,6 @@
+using SmartOrders.Helpers;
+using UnityEngine;
+
 namespace SmartOrders;
 
 using System;
@@ -16,6 +19,8 @@ public sealed class SmartOrdersPlugin : SingletonPluginBase<SmartOrdersPlugin>, 
     public static IUIHelper UiHelper { get; private set; } = null!;
     public static Settings Settings { get; private set; }
 
+    public static TrackNodeHelper TrackNodeHelper { get; private set; }
+
     private readonly ILogger _Logger = Log.ForContext<SmartOrdersPlugin>()!;
 
     public SmartOrdersPlugin(IModdingContext context, IUIHelper uiHelper)
@@ -31,6 +36,9 @@ public sealed class SmartOrdersPlugin : SingletonPluginBase<SmartOrdersPlugin>, 
         _Logger.Information("OnEnable");
         var harmony = new Harmony("SmartOrders");
         harmony.PatchAll();
+
+        var go = new GameObject();
+        TrackNodeHelper = go.AddComponent<TrackNodeHelper>()!;
     }
 
     public override void OnDisable()
@@ -38,6 +46,9 @@ public sealed class SmartOrdersPlugin : SingletonPluginBase<SmartOrdersPlugin>, 
         _Logger.Information("OnDisable");
         var harmony = new Harmony("SmartOrders");
         harmony.UnpatchAll();
+
+        UnityEngine.Object.Destroy(TrackNodeHelper.gameObject!);
+        TrackNodeHelper = null!;
     }
 
     public void ModTabDidOpen(UIPanelBuilder builder) {
@@ -47,11 +58,14 @@ public sealed class SmartOrdersPlugin : SingletonPluginBase<SmartOrdersPlugin>, 
             builder.Rebuild();
         })!);
 
-        builder.AddField("Switch off handbrakes", builder.AddToggle(() => Settings.AutoSwitchOffHanbrake, o => Settings.AutoSwitchOffHanbrake = o)!)
-                .Tooltip("Switch off handbrakes", "In Yard mode, automatically switch off the handbrakes for any cars in the train before moving");
+        builder.AddField("Apply handbrakes", builder.AddToggle(() => Settings.AutoApplyHandbrake, o => Settings.AutoApplyHandbrake = o)!)
+                .Tooltip("Apply handbrakes", "When decoupling stationary cars, set the handbrake in the first car");
+
+        builder.AddField("Release handbrakes", builder.AddToggle(() => Settings.AutoReleaseHandbrake, o => Settings.AutoReleaseHandbrake = o)!)
+                .Tooltip("Release handbrakes", "In Yard mode, automatically release the handbrakes for any cars in the train before moving");
 
         builder.AddField("Couple air", builder.AddToggle(() => Settings.AutoCoupleAir, o => Settings.AutoCoupleAir = o)!)
-                .Tooltip("Couple air", "In Yard mode, automatically couple air for any cars in the train before moving");
+                .Tooltip("Couple air", "In Yard mode, automatically couple air and open anglecocks for any cars in the train before moving");
 
         builder.AddField("Remove Yard Mode Speed Limit", builder.AddToggle(() => Settings.NoYardSpeedLimit, o => Settings.NoYardSpeedLimit = o)!)
                 .Tooltip("Remove Yard Mode Speed Limit", "Remove 15mph speed limit in yard mode");
