@@ -339,11 +339,6 @@ public static class SmartOrdersUtility
         return (locationB.IsValid ? locationB : car.WheelBoundsB).Flipped();
     }
     
-    public static void MoveCameraToNode(TrackNode node){
-         CameraSelector.shared.ZoomToPoint(node.transform.localPosition);
-         SmartOrdersPlugin.TrackNodeHelper.Show(node);
-    }
-
     public static void DisconnectCarGroups(BaseLocomotive locomotive, int numGroups, AutoEngineerPersistence persistence)
     {
         var end = numGroups > 0 ? "front" : "back";
