@@ -29,6 +29,7 @@ public static class CarInspectorPatches
     [HarmonyPatch(typeof(CarInspector), "Populate")]
     public static void Populate(ref Window ____window) {
         var windowAutoHeight = ____window.gameObject!.GetComponent<CarInspectorAutoHeightBehavior>()!;
+        windowAutoHeight.ExpandOrders(AutoEngineerMode.Road, 30);
         windowAutoHeight.ExpandOrders(AutoEngineerMode.Yard, 30 + 60 + 30);
     }
 
