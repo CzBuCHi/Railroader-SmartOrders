@@ -259,7 +259,8 @@ public static class SmartOrdersUtility
 
         distanceInMeters = Math.Max(0, distanceInMeters);
 
-        // NOTE: This should not be here ...
+        // NOTE: This should not be here ... (method should only return distance  + targetSwitch
+        //    and not also print message to console)
         // >>
         var action = "Reversing";
         if (orders.Forward)
@@ -456,6 +457,11 @@ public static class SmartOrdersUtility
         newEndCar.ApplyEndGearChange(newEndCarEndToDisconnect, EndGearStateKey.CutLever, 1f);
         newEndCar.ApplyEndGearChange(newEndCarEndToDisconnect, EndGearStateKey.Anglecock, 0f);
         carToDisconnect.ApplyEndGearChange(carToDisconnectEndToDisconnect, EndGearStateKey.Anglecock, 0f);
+    }
+    
+    public static void MoveCameraToNode(TrackNode node){
+         CameraSelector.shared.ZoomToPoint(node.transform.localPosition);
+         SmartOrdersPlugin.TrackNodeHelper.Show(node);
     }
 
 }
