@@ -59,7 +59,7 @@ public static class SmartOrdersUtility
 
         const float FEET_PER_METER = 3.28084f;
         const float CAR_LENGTH_IN_METERS = 12.192f;
-        const float MAX_DISTANCE_IN_METERS = 10000f / FEET_PER_METER;
+        const float MAX_DISTANCE_IN_METERS = 100000f / FEET_PER_METER;
 
         if (stopBeforeSwitch)
         {
