@@ -1,3 +1,5 @@
+using GalaSoft.MvvmLight.Messaging;
+using Game.Events;
 using SmartOrders.Helpers;
 using UnityEngine;
 
@@ -21,7 +23,7 @@ public sealed class SmartOrdersPlugin : SingletonPluginBase<SmartOrdersPlugin>, 
 
     public static TrackNodeHelper TrackNodeHelper { get; private set; }
 
-    private readonly ILogger _Logger = Log.ForContext<SmartOrdersPlugin>()!;
+    private readonly Serilog.ILogger _Logger = Serilog.Log.ForContext<SmartOrdersPlugin>()!;
 
     public SmartOrdersPlugin(IModdingContext context, IUIHelper uiHelper)
     {
@@ -29,6 +31,8 @@ public sealed class SmartOrdersPlugin : SingletonPluginBase<SmartOrdersPlugin>, 
         UiHelper = uiHelper;
 
         Settings = Context.LoadSettingsData<Settings>("SmartOrders") ?? new Settings();
+
+
     }
 
     public override void OnEnable()
@@ -37,8 +41,8 @@ public sealed class SmartOrdersPlugin : SingletonPluginBase<SmartOrdersPlugin>, 
         var harmony = new Harmony("SmartOrders");
         harmony.PatchAll();
 
-        var go = new GameObject();
-        TrackNodeHelper = go.AddComponent<TrackNodeHelper>()!;
+        Messenger.Default!.Register(this, new Action<MapDidLoadEvent>(OnMapDidLoad));
+        Messenger.Default.Register(this, new Action<MapDidUnloadEvent>(OnMapDidUnload));
     }
 
     public override void OnDisable()
@@ -47,6 +51,15 @@ public sealed class SmartOrdersPlugin : SingletonPluginBase<SmartOrdersPlugin>, 
         var harmony = new Harmony("SmartOrders");
         harmony.UnpatchAll();
 
+        Messenger.Default!.Unregister(this);
+    }
+
+    private void OnMapDidLoad(MapDidLoadEvent obj) {
+        var go = new GameObject();
+        TrackNodeHelper = go.AddComponent<TrackNodeHelper>()!;
+    }
+
+    private void OnMapDidUnload(MapDidUnloadEvent obj) {
         UnityEngine.Object.Destroy(TrackNodeHelper.gameObject!);
         TrackNodeHelper = null!;
     }
