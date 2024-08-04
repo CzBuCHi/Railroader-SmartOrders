@@ -454,20 +454,13 @@ public static class SmartOrdersUtility
         carToDisconnect.ApplyEndGearChange(carToDisconnectEndToDisconnect, EndGearStateKey.Anglecock, 0f);
     }
     
-    private static readonly Serilog.ILogger _Logger = Serilog.Log.ForContext(typeof(SmartOrdersUtility))!;
-
     public static void MoveCameraToNode(TrackNode node) {
+        var position = CameraSelector.shared!.CurrentCameraPosition;
+        SmartOrdersPlugin.TrackNodeHelper.OnHidden = () => CameraSelector.shared.ZoomToPoint(position);
 
-        _Logger.Information("MoveCameraToNode: " + node);
-        _Logger.Information("MoveCameraToNode: " + node.transform);
-        _Logger.Information("MoveCameraToNode: " + node.transform.localPosition);
-        _Logger.Information("MoveCameraToNode: ZoomToPoint");
-         CameraSelector.shared.ZoomToPoint(node.transform.localPosition);
+        CameraSelector.shared.ZoomToPoint(node.transform!.localPosition);
 
-         _Logger.Information("MoveCameraToNode: Show");
-
-
-         SmartOrdersPlugin.TrackNodeHelper.Show(node);
+        SmartOrdersPlugin.TrackNodeHelper.Show(node);
     }
 
 }
