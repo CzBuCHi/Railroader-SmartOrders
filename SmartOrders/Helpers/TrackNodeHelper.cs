@@ -38,7 +38,7 @@ public sealed class TrackNodeHelper : MonoBehaviour
     }
 
     private IEnumerator Routine() {
-        yield return new WaitForSecondsRealtime(2f);
+        yield return new WaitForSecondsRealtime(3f);
         _LineRenderer!.enabled = false;
         OnHidden?.Invoke();
     }

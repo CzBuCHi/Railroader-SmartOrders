@@ -194,13 +194,13 @@ public static class CarInspectorPatches
             strip =>
             {
                 
-                strip.AddButton("1", () => MovePastSwitches(helper, 1, locomotive.KeyValueObject.Get("CLEAR_SWITCH_MODE"), locomotive, persistence, !GameInput.IsShiftDown))!
+                strip.AddButton("1", () => MovePastSwitches(helper, 1, locomotive.KeyValueObject.Get("CLEAR_SWITCH_MODE"), locomotive, persistence, GameInput.IsShiftDown))!
                     .Tooltip("1 switch", "Move 1 switch");
 
                 for (var i = 2; i <= 10; i++)
                 {
                     var numSwitches = i;
-                    strip.AddButton($"{numSwitches}", () => MovePastSwitches(helper, numSwitches, locomotive.KeyValueObject.Get("CLEAR_SWITCH_MODE"), locomotive, persistence, !GameInput.IsShiftDown))!
+                    strip.AddButton($"{numSwitches}", () => MovePastSwitches(helper, numSwitches, locomotive.KeyValueObject.Get("CLEAR_SWITCH_MODE"), locomotive, persistence, GameInput.IsShiftDown))!
                         .Tooltip($"{numSwitches} switches", $"Move {numSwitches} switches");
                 }
             }, 4);

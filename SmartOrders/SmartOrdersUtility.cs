@@ -453,25 +453,29 @@ public static class SmartOrdersUtility
         newEndCar.ApplyEndGearChange(newEndCarEndToDisconnect, EndGearStateKey.Anglecock, 0f);
         carToDisconnect.ApplyEndGearChange(carToDisconnectEndToDisconnect, EndGearStateKey.Anglecock, 0f);
     }
-    
+
+    private static (Vector3 initial, bool isFirstPerson)? _CameraState;
+
     public static void MoveCameraToNode(TrackNode node) {
-        var isFirstPerson = CameraSelector.shared!.CurrentCameraIsFirstPerson;
-        var initial = CameraSelector.shared.CurrentCameraPosition;
+        var cameraSelector = CameraSelector.shared!;
+
+        _CameraState ??= (cameraSelector.CurrentCameraPosition, cameraSelector.CurrentCameraIsFirstPerson);
 
         // move camera
-        CameraSelector.shared.ZoomToPoint(node.transform!.localPosition);
+        cameraSelector.ZoomToPoint(node.transform!.localPosition);
 
-        var afterMove = CameraSelector.shared.CurrentCameraPosition;
+        var afterMove = cameraSelector.CurrentCameraPosition;
         SmartOrdersPlugin.TrackNodeHelper.OnHidden = () => {
             // move camera back if was not moved when arrows hides itself 
-            var current = CameraSelector.shared!.CurrentCameraPosition;
-            if (current == afterMove) {
-                if (isFirstPerson) {
-                    CameraSelector.shared.SelectCamera(CameraSelector.CameraIdentifier.FirstPerson);
+            if (cameraSelector.CurrentCameraPosition == afterMove) {
+                if (_CameraState.Value.isFirstPerson) {
+                    cameraSelector.SelectCamera(CameraSelector.CameraIdentifier.FirstPerson);
                 } else {
-                    CameraSelector.shared.ZoomToPoint(initial);
+                    cameraSelector.ZoomToPoint(_CameraState.Value.initial);
                 }
             }
+
+            _CameraState = null;
         };
 
         // show arrow for 2 seconds
