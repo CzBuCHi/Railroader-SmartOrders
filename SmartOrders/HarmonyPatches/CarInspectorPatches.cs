@@ -26,7 +26,9 @@ using static Model.Car;
 [HarmonyPatch]
 public static class CarInspectorPatches
 {
-    [HarmonyPostfix]
+    public static bool InsidePopulateAIPanel;
+
+	[HarmonyPostfix]
     [HarmonyPatch(typeof(CarInspector), "Populate")]
     public static void Populate(ref Window ____window) {
         var windowAutoHeight = ____window.gameObject!.GetComponent<CarInspectorAutoHeightBehavior>()!;
@@ -35,6 +37,12 @@ public static class CarInspectorPatches
     }
 
     [HarmonyPrefix]
+    [HarmonyPatch(typeof(CarInspector), "PopulateAIPanel")]
+    public static void PopulateAIPanelPrefix() {
+        InsidePopulateAIPanel = true;
+    }
+    
+    [HarmonyPrefix]
     [HarmonyPatch(typeof(CarInspector), "BuildContextualOrders")]
     public static void BuildContextualOrders(UIPanelBuilder builder, AutoEngineerPersistence persistence, Car ____car, Window ____window)
     {
@@ -42,6 +50,9 @@ public static class CarInspectorPatches
         {
             return;
         }
+
+        InsidePopulateAIPanel = false;
+
         var locomotive = (BaseLocomotive)____car;
         var helper = new AutoEngineerOrdersHelper(locomotive, persistence);
         var mode2 = helper.Mode();
@@ -82,8 +93,7 @@ public static class CarInspectorPatches
 
     private static void BuildAlternateCarLengthsButtons(UIPanelBuilder builder, BaseLocomotive locomotive, AutoEngineerOrdersHelper helper)
     {
-        // color is same-ish as vanilla, but it is workaround for bug in UIPanelBuilderPatches ...
-        builder.AddField("Car Lengths".Color("aaaaaa"), builder.ButtonStrip(delegate (UIPanelBuilder builder)
+        builder.AddField("Car Lengths", builder.ButtonStrip(delegate (UIPanelBuilder builder)
         {
             builder.AddButton("Stop", delegate
             {
