@@ -20,7 +20,7 @@ public sealed class TrackNodeHelper : MonoBehaviour
         lineRenderer.useWorldSpace = false;
         lineRenderer.SetPosition(0, new Vector3(-0.2f, 0.5f, 0));
         lineRenderer.SetPosition(1, new Vector3(0, 0, 0));
-        lineRenderer.SetPosition(2, new Vector3(0, 4, 0));
+        lineRenderer.SetPosition(2, new Vector3(0, 6, 0));
         lineRenderer.SetPosition(3, new Vector3(0, 0, 0));
         lineRenderer.SetPosition(4, new Vector3(0.2f, 0.5f, 0));
         lineRenderer.enabled = true;
