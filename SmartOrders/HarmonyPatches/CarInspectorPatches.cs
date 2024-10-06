@@ -1,4 +1,9 @@
-﻿using CarInspectorResizer.Behaviors;
+﻿using System.Collections;
+using System.Net;
+using System.Runtime.CompilerServices;
+using CarInspectorResizer.Behaviors;
+using Core;
+using Game.Notices;
 
 namespace SmartOrders.HarmonyPatches;
 
@@ -220,6 +225,11 @@ public static class CarInspectorPatches
     private static void MoveDistance(AutoEngineerOrdersHelper helper, BaseLocomotive locomotive, float distance)
     {
         helper.SetOrdersValue(AutoEngineerMode.Yard, null, null, distance);
+        MoveCompleteBehavior.CallWhenLocomotiveStops(locomotive, () => { 
+            var entityReference = new EntityReference(EntityType.Car, locomotive.id!);
+            NoticeManager.Shared.PostEphemeral(entityReference, "SmartOrders", "Move Completed");
+        });
+        
     }
 
     private static void MovePastSwitches(AutoEngineerOrdersHelper helper, int switchesToFind, KeyValue.Runtime.Value mode, BaseLocomotive locomotive, AutoEngineerPersistence persistence, bool showTargetSwitch)
@@ -305,4 +315,37 @@ public static class CarInspectorPatches
 
         }, 4)).Tooltip("Disconnect Car Groups", "Disconnect groups of cars headed for the same location from the front (positive numbers) or the back (negative numbers) in the direction of travel");
     }
+}
+
+public class MoveCompleteBehavior : MonoBehaviour
+{
+    private static MoveCompleteBehavior? _Instance;
+
+    public static void CallWhenLocomotiveStops(BaseLocomotive locomotive, Action callback) {
+        if (_Instance == null) {
+            var go = new GameObject("MoveCompleteBehavior");
+            _Instance = go.AddComponent<MoveCompleteBehavior>()!;
+        }
+
+        _Instance.StartCoroutine(Coroutine(locomotive, callback));
+    }
+
+    private static IEnumerator Coroutine(BaseLocomotive locomotive, Action callback) {
+        // wait for AI to start moving ...
+        yield return new WaitWhile(() => locomotive.IsStopped());
+        yield return new WaitForSecondsRealtime(1);
+
+        var stopMove    = false;
+        var persistence = new AutoEngineerPersistence(locomotive.KeyValueObject!);
+        var observer    = persistence.ObserveOrders(_ => stopMove = true, false);
+        yield return new WaitUntil(() => {
+            var manualStopDistance = locomotive.AutoEngineerPlanner!.GetManualStopDistance();
+            return stopMove || manualStopDistance < 0.01f;
+        });
+
+        observer.Dispose();
+
+        callback();
+    }
+
 }

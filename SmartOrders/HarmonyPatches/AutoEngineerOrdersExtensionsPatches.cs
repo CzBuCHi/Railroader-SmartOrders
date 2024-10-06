@@ -4,6 +4,8 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using Game.Messages;
 using HarmonyLib;
+using Model.AI;
+using Model;
 using Track;
 using UI.EngineControls;
 
@@ -23,4 +25,9 @@ public static class AutoEngineerOrdersExtensionsPatches
             _ => throw new ArgumentOutOfRangeException("mode", mode, null),
         };
     }
+
+    public static float? GetManualStopDistance(this AutoEngineerPlanner autoEngineerPlanner) =>
+        (float?)AccessTools.Field(typeof(AutoEngineerPlanner), "_manualStopDistance")!.GetValue(autoEngineerPlanner);
+
+
 }
