@@ -220,16 +220,20 @@ public static class CarInspectorPatches
                 }
             }, 4);
         }));
+
+        builder.AddField("Notice", builder.AddToggle(() => locomotive.KeyValueObject.Get("NOTICE_MOVE_COMPLETED"), o => locomotive.KeyValueObject.Set("NOTICE_MOVE_COMPLETED", o)));
     }
 
     private static void MoveDistance(AutoEngineerOrdersHelper helper, BaseLocomotive locomotive, float distance)
     {
         helper.SetOrdersValue(AutoEngineerMode.Yard, null, null, distance);
-        MoveCompleteBehavior.CallWhenLocomotiveStops(locomotive, () => { 
-            var entityReference = new EntityReference(EntityType.Car, locomotive.id!);
-            NoticeManager.Shared.PostEphemeral(entityReference, "SmartOrders", "Move Completed");
-        });
-        
+
+        if (locomotive.KeyValueObject.Get("NOTICE_MOVE_COMPLETED") == true) {
+            MoveCompleteBehavior.CallWhenLocomotiveStops(locomotive, () => {
+                var entityReference = new EntityReference(EntityType.Car, locomotive.id!);
+                NoticeManager.Shared.PostEphemeral(entityReference, "SmartOrders", "Move Completed");
+            });
+        }
     }
 
     private static void MovePastSwitches(AutoEngineerOrdersHelper helper, int switchesToFind, KeyValue.Runtime.Value mode, BaseLocomotive locomotive, AutoEngineerPersistence persistence, bool showTargetSwitch)
