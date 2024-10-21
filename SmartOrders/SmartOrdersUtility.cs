@@ -168,41 +168,10 @@ public static class SmartOrdersUtility
                 {
                     break;
                 }
-
-                // update segments if looking past switch
-
-                // for switches we need to work out which way it is going
-                graph.DecodeSwitchAt(node, out var switchEnterSegment, out var switchExitNormal, out var switchExitReverse);
-
-                // switchEnterSegment, switchExitSegmentA, switchExitSegmentB cannot be null here, because graph.IsSwitch(node) call above ...
-
-                // if we are coming from a switch exit, the next segment is the switch entrance
-                if (switchExitNormal != null && segment.id == switchExitNormal.id || switchExitReverse != null && segment.id == switchExitReverse.id)
-                {
-                    DebugLog("Switch only has one exit");
-                    segment = switchEnterSegment;
-                }
-                else
-                {
-                    // otherwise depends on if the switch is thrown
-                    if (node.isThrown)
-                    {
-                        DebugLog("Following thrown exit");
-                        segment = switchExitReverse;
-                    }
-                    else
-                    {
-                        DebugLog("Following normal exit");
-                        segment = switchExitNormal;
-                    }
-                }
             }
-            else
-            {
-                // next segment for non-switches
-                graph.SegmentsReachableFrom(segment, segmentEnd, out var segmentExitNormal, out _);
-                segment = segmentExitNormal;
-            }
+
+            // update segments if looking past switch
+            segment = GetNextSegment(node, segment, segmentEnd);
 
             if (segment == null)
             {
@@ -253,6 +222,10 @@ public static class SmartOrdersUtility
                 if (!clearSwitchesUnderTrain)
                 {
                     distanceInMeters += totalLength;
+                }
+
+                if (node != null && !TrainCanFitAfterSwitch(totalLength, node, segment, segmentEnd, out var trackLength)) {
+                    Say($"Train is too long ({totalLength}m) and will not fit there (only {trackLength}m available) ...");
                 }
             }
         }
@@ -305,6 +278,63 @@ public static class SmartOrdersUtility
         }
         // <<
         return distanceInMeters;
+    }
+
+    private static TrackSegment? GetNextSegment(TrackNode node, TrackSegment segment, TrackSegment.End segmentEnd) {
+        var graph = Graph.Shared!;
+        if (!graph.DecodeSwitchAt(node, out var switchEnterSegment, out var switchExitNormal, out var switchExitReverse)) {
+            // next segment for non-switches
+            graph.SegmentsReachableFrom(segment, segmentEnd, out var segmentExitNormal, out _);
+            return segmentExitNormal;
+        }
+
+        // if we are coming from a switch exit, the next segment is the switch entrance
+        if (switchExitNormal != null && segment.id == switchExitNormal.id || switchExitReverse != null && segment.id == switchExitReverse.id) {
+            DebugLog("Switch only has one exit");
+            return switchEnterSegment;
+        }
+
+        // otherwise depends on if the switch is thrown
+        if (node.isThrown) {
+            DebugLog("Following thrown exit");
+            return switchExitReverse;
+        }
+
+        DebugLog("Following normal exit");
+        return switchExitNormal;
+    }
+
+
+    private static bool TrainCanFitAfterSwitch(float trainLength, TrackNode targetSwitch, TrackSegment enterSegment, TrackSegment.End segmentEnd, out float trackLength) {
+        trackLength = 0f;
+
+        var node    = targetSwitch;
+        var segment = enterSegment;
+
+        while (trainLength > trackLength) {
+
+            segment = GetNextSegment(node, segment, segmentEnd);
+            if (segment == null)
+            {
+                DebugLog("Next segment is null");
+                return false;
+            }
+
+            
+            trackLength += segment.GetLength();
+            DebugLog($"Adding track segment {segment.GetLength()}; need: {trainLength}, have: {trackLength}");
+
+            // next segment end is whatever end is NOT pointing at the current node
+            segmentEnd = segment.NodeForEnd(TrackSegment.End.A).id == node.id ? TrackSegment.End.B : TrackSegment.End.A;
+
+            node = segment.NodeForEnd(segmentEnd);
+            if (node == null) {
+                DebugLog("Next node is null");
+                return false;
+            }
+        }
+
+        return trainLength < trackLength;
     }
 
     public static void DebugLog(string message)
